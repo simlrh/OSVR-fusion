@@ -15,7 +15,7 @@ namespace je_nourish_fusion {
 			m_useAlign = config.isMember("alignInitialOrientation") 
 				&& config["alignInitialOrientation"].asBool();
 
-			if (m_useOffset = config.isMember("offsetFromRotationCenter")) {
+			if ((m_useOffset = config.isMember("offsetFromRotationCenter"))) {
 				osvrVec3Zero(&m_offset);
 
 				if (config["offsetFromRotationCenter"].isMember("x")) {
