@@ -1,0 +1,14 @@
+{
+	"deviceVendor": "Steve Le Roy Harris",
+	"deviceName": "Tracker Fusion",
+	"author": "Steve Le Roy Harris <steve@nourish.je>",
+	"version": 1,
+	"lastModified": "2016-06-25T21:13:07.585Z",
+	"interfaces": {
+		"tracker": {
+			"position": true,
+			"orientation": true,
+			"count": 1
+		}
+	}
+}
