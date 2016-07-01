@@ -4,12 +4,7 @@ An OSVR plugin that creates trackers from different sources of data. For example
 
 It can also combine axes from different trackers, eg taking pitch and roll from an accelerometer and yaw from a magnetometer, or x and y position from a video tracker and z position from a depth camera.
 
-    git clone https://github.com/simlrh/OSVR-fusion
-    cd OSVR-fusion
-    git submodule init
-    git submodule update
-
-Then follow the standard OSVR plugin build instructions.
+Build following the [standard OSVR plugin build instructions](http://resource.osvr.com/docs/OSVR-Core/TopicWritingDevicePlugin.html).
 
 Sample osvr_server_config.json:
 
