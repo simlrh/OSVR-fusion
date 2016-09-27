@@ -7,13 +7,10 @@ namespace je_nourish_fusion {
 	class FusionDevice {
 	public:
 		FusionDevice(OSVR_PluginRegContext ctx, Json::Value config) {
-			std::cout << "Constructing fusion device" << std::endl;
-
-			m_firstUpdate = true;
 			osvrPose3SetIdentity(&m_state);
 
-			m_useAlign = config.isMember("alignInitialOrientation") 
-				&& config["alignInitialOrientation"].asBool();
+			m_useTimestamp = config.isMember("timestamp");
+			m_usePositionTimestamp = m_useTimestamp && config["timestamp"].asString().compare("position") == 0;
 
 			if ((m_useOffset = config.isMember("offsetFromRotationCenter"))) {
 				osvrVec3Zero(&m_offset);
@@ -42,10 +39,10 @@ namespace je_nourish_fusion {
 			m_orientationReader = OrientationReaderFactory::getReader(m_ctx, config["orientation"]);
 
 			if (m_positionReader == NULL) {
-				std::cout << "Position Reader not created" << std::endl;
+				std::cout << "Fusion Device: Position Reader not created" << std::endl;
 			}
 			if (m_orientationReader == NULL) {
-				std::cout << "Orientation Reader not created" << std::endl;
+				std::cout << "Fusion Device: Orientation Reader not created" << std::endl;
 			}
 
 			m_dev->sendJsonDescriptor(je_nourish_fusion_json);
@@ -53,20 +50,13 @@ namespace je_nourish_fusion {
 		}
 
 		OSVR_ReturnCode update() {
-
 			osvrClientUpdate(m_ctx);
 
-			m_positionReader->update(&m_state.translation);
-			m_orientationReader->update(&m_state.rotation);
+			OSVR_TimeValue timeValuePosition;
+			OSVR_TimeValue timeValueOrientation;
 
-
-			if (m_useAlign) {
-				if (m_firstUpdate) {
-					m_firstUpdate = false;
-					setupAlign(&m_align, &m_state);
-				}
-				applyAlign(&m_align, &m_state);
-			}
+			m_positionReader->update(&m_state.translation, &timeValuePosition);
+			m_orientationReader->update(&m_state.rotation, &timeValueOrientation);
 
 			if (m_useOffset) {
 				Eigen::Quaterniond rotation = osvr::util::fromQuat(m_state.rotation);
@@ -75,7 +65,13 @@ namespace je_nourish_fusion {
 				translation += rotation._transformVector(osvr::util::vecMap(m_offset));
 			}
 
-			osvrDeviceTrackerSendPose(*m_dev, m_tracker, &m_state, 0);
+			if (m_useTimestamp) {
+				OSVR_TimeValue timeValue = m_usePositionTimestamp ? timeValuePosition : timeValueOrientation;
+				osvrDeviceTrackerSendPoseTimestamped(*m_dev, m_tracker, &m_state, 0, &timeValue);
+			}
+			else {
+				osvrDeviceTrackerSendPose(*m_dev, m_tracker, &m_state, 0);
+			}
 
 			return OSVR_RETURN_SUCCESS;
 		}
@@ -92,13 +88,11 @@ namespace je_nourish_fusion {
 		OSVR_TrackerDeviceInterface m_tracker;
 		OSVR_PoseState m_state;
 
-		bool m_firstUpdate;
-
-		bool m_useAlign;
-		OSVR_PoseState m_align;
-
 		bool m_useOffset;
 		OSVR_Vec3 m_offset;
+
+		bool m_useTimestamp;
+		bool m_usePositionTimestamp;
 	};
 
 	class FusionDeviceConstructor {

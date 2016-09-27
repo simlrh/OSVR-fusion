@@ -6,7 +6,17 @@ It can also combine axes from different trackers, eg taking pitch and roll from 
 
 Build following the [standard OSVR plugin build instructions](http://resource.osvr.com/docs/OSVR-Core/TopicWritingDevicePlugin.html).
 
-Sample osvr_server_config.json:
+## Tracker alignment
+
+The orientation and position data will likely be misaligned, eg, you are facing forward and leaning forward, but your tracked position instead moves to the side. To correct this, align the orientation tracker with the position tracker's axes and run osvr_reset_yaw on the orientation tracker.
+
+For example, with the OSVR HDK and a Kinect, you would place the HDK in front of the Kinect, pointing towards it, then run
+
+    osvr_reset_yaw.exe --path "/com_osvr_Multiserver/OSVRHackerDevKitPrediction0/semantic/hmd"
+
+This replaces the `alignInitialOrientation` option in previous versions.
+	
+## Sample osvr_server_config.json:
 
     {
     	"drivers": [
@@ -18,14 +28,14 @@ Sample osvr_server_config.json:
     				"name": "DK1_Kinectv2",
     				"position": "/je_nourish_kinectv2/KinectV2/semantic/body1/head",
     				"orientation": "/je_nourish_openhmd/Oculus Rift (Devkit)/semantic/hmd",
-					// Align DK1 and Kinect axes (point hmd directly at kinect on startup)
-    				"alignInitialOrientation": true,
 					// Eyes are above and in front of the center of the head
     				"offsetFromRotationCenter": {
     					"x": 0,
     					"y": 0.01,
     					"z": -0.05
-    				}
+    				},
+					// Pass the timestamp from the Kinect skeleton data to OSVR
+					"timestamp": "position"
     			}
     		},
 			// Combine more accurate pitch and roll from Wii Nunchuk with yaw and position from Kinect

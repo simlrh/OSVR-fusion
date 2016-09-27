@@ -19,10 +19,8 @@ namespace je_nourish_fusion {
 	SingleOrientationReader::SingleOrientationReader(OSVR_ClientContext ctx, std::string orientation_path) {
 		osvrClientGetInterface(ctx, orientation_path.c_str(), &m_orientation);
 	}
-	OSVR_ReturnCode SingleOrientationReader::update(OSVR_OrientationState* orientation) {
-		OSVR_TimeValue timestamp;
-
-		return osvrGetOrientationState(m_orientation, &timestamp, orientation);
+	OSVR_ReturnCode SingleOrientationReader::update(OSVR_OrientationState* orientation, OSVR_TimeValue* timeValue) {
+		return osvrGetOrientationState(m_orientation, timeValue, orientation);
 	}
 
 	CombinedOrientationReader::CombinedOrientationReader(OSVR_ClientContext ctx, Json::Value orientation_paths) {
@@ -31,16 +29,14 @@ namespace je_nourish_fusion {
 		osvrClientGetInterface(ctx, orientation_paths["yaw"].asCString(), &(m_orientations[2]));
 	}
 
-	OSVR_ReturnCode CombinedOrientationReader::update(OSVR_OrientationState* orientation) {
+	OSVR_ReturnCode CombinedOrientationReader::update(OSVR_OrientationState* orientation, OSVR_TimeValue* timeValue) {
 		OSVR_OrientationState orientation_x;
 		OSVR_OrientationState orientation_y;
 		OSVR_OrientationState orientation_z;
 
-		OSVR_TimeValue timestamp;
-
-		OSVR_ReturnCode xret = osvrGetOrientationState(m_orientations[0], &timestamp, &orientation_x);
-		OSVR_ReturnCode yret = osvrGetOrientationState(m_orientations[1], &timestamp, &orientation_y);
-		OSVR_ReturnCode zret = osvrGetOrientationState(m_orientations[2], &timestamp, &orientation_z);
+		OSVR_ReturnCode xret = osvrGetOrientationState(m_orientations[0], timeValue, &orientation_x);
+		OSVR_ReturnCode yret = osvrGetOrientationState(m_orientations[1], timeValue, &orientation_y);
+		OSVR_ReturnCode zret = osvrGetOrientationState(m_orientations[2], timeValue, &orientation_z);
 
 		OSVR_Vec3 rpy_x;
 		OSVR_Vec3 rpy_y;
