@@ -26,7 +26,7 @@ This replaces the `alignInitialOrientation` option in previous versions.
     			"driver": "FusionDevice",
     			"params": {
     				"name": "DK1_Kinectv2",
-    				"position": "/je_nourish_kinectv2/KinectV2/semantic/body1/head",
+    				"position": "/je_nourish_kinect/KinectV2/semantic/body1/head",
     				"orientation": "/je_nourish_openhmd/Oculus Rift (Devkit)/semantic/hmd",
 					// Eyes are above and in front of the center of the head
     				"offsetFromRotationCenter": {
@@ -44,7 +44,7 @@ This replaces the `alignInitialOrientation` option in previous versions.
     			"driver": "FusionDevice",
     			"params": {
     				"name": "Wii_Kinect_Right",
-    				"position": "/je_nourish_kinectv2/KinectV2/semantic/body1/arms/right/hand",
+    				"position": "/je_nourish_kinect/KinectV2/semantic/body1/arms/right/hand",
     				"orientation": {
     					"roll": "/je_nourish_wiimote/WiimoteDevice/semantic/wiimote1/nunchuk",
     					"pitch": "/je_nourish_wiimote/WiimoteDevice/semantic/wiimote1/nunchuk",
