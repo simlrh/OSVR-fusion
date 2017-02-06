@@ -1,4 +1,4 @@
-# OSVR-fusion
+# OSVR-fusion [![Donate](https://nourish.je/assets/images/donate.svg)](http://ko-fi.com/A250KJT)
 
 An OSVR plugin that creates trackers from different sources of data. For example, taking the orientation data from an HMD with no positional tracking, and the position data from a motion controller with no orientation data.
 
