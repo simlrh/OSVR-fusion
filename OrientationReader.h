@@ -38,7 +38,6 @@ namespace je_nourish_fusion {
 		osvr::clientkit::ClientContext m_ctx;
 		double m_alpha;
 		double m_last_yaw;
-		OSVR_TimeValue m_last_timeValue;
 	};
 
 }

@@ -38,10 +38,10 @@ namespace je_nourish_fusion {
 		osvrClientGetInterface(ctx, orientation_paths["pitch"].asCString(), &(m_orientations[1]));
 		osvrClientGetInterface(ctx, orientation_paths["yawFast"].asCString(), &(m_orientations[2]));
 		osvrClientGetInterface(ctx, orientation_paths["yawAccurate"].asCString(), &(m_orientations[3]));
-		// TO DO: Is this a bogus way to read in this value? Do I care?
 		m_alpha = orientation_paths["alpha"].asDouble();
 		m_last_yaw = 0;
-		m_last_timeValue = osvr::util::time::getNow();
+
+		m_ctx.log(OSVR_LogLevel::OSVR_LOGLEVEL_INFO, "Initialized a complementary fusion filter.");
 	}
 
 	OSVR_ReturnCode CombinedOrientationReader::update(OSVR_OrientationState* orientation, OSVR_TimeValue* timeValue) {
@@ -93,54 +93,31 @@ namespace je_nourish_fusion {
 		rpyFromQuaternion(&orientation_z, &rpy_z);
 		rpyFromQuaternion(&angular_v.incrementalRotation, &rpy_v);
 
-		/*---------------------------------------
-		// Filter Implementation Here
-		---------------------------------------*/
-		double dz_fast;
-		double z_fast;
-		double z_accurate;
-		double dt;
-		double z_out;
 		double a = m_alpha;
 		double last_z = m_last_yaw;
 		
-		dt = angular_v.dt * 2 * M_PI;
+		// A factor of 2*PI is missing in angularVelocity incremental quats - at least with the HDK.
+		double dt = angular_v.dt * 2 * M_PI;
 
-		//dt = ::osvr::util::time::duration(*timeValue, m_last_timeValue);
-		//m_last_timeValue = *timeValue;
+		double z_accurate = osvrVec3GetZ(&rpy_z);
+		double dzdt_fast = osvrVec3GetZ(&rpy_v);
 
-		dz_fast = osvrVec3GetZ(&rpy_v);
-		z_accurate = osvrVec3GetZ(&rpy_z);
+		double dz_fast = dt * dzdt_fast;
 
-		z_fast = dt * dz_fast;
-
-		z_fast = fixUnityAngle(z_fast);
+		dz_fast = fixUnityAngle(dz_fast);
 		z_accurate = fixUnityAngle(z_accurate);
 
+		// Correct for the singularity at +-180 degrees
 		if ((z_accurate < -M_PI / 2 && last_z > M_PI / 2) || (z_accurate > M_PI / 2 && last_z < -M_PI / 2)) {
 			last_z = z_accurate;
-			//z_fast = z_accurate;
 		}
 
-		z_out = a*(last_z + z_fast) + (1 - a)*(z_accurate);
+		double z_out = a*(last_z + dz_fast) + (1 - a)*(z_accurate);
 		
-		// TO-DO: Eventually this can be removed. It should be unnecessary.
+		// Replace bogus results with accurate yaw. Happens sometimes on startup.
 		if (std::isnan(z_out)) {
-			z_out = 0;
+			z_out = z_accurate;
 		}
-		
-		static int boop;
-		boop += 1;
-		if (boop >= 250)
-		{
-			m_ctx.log(OSVR_LogLevel::OSVR_LOGLEVEL_INFO, "dt");
-			m_ctx.log(OSVR_LogLevel::OSVR_LOGLEVEL_INFO, std::to_string(dt).c_str());
-			m_ctx.log(OSVR_LogLevel::OSVR_LOGLEVEL_INFO, std::to_string(z_out).c_str());
-			boop = 0;
-		}
-		
-		//m_ctx.log(OSVR_LogLevel::OSVR_LOGLEVEL_INFO, "data:");
-		//m_ctx.log(OSVR_LogLevel::OSVR_LOGLEVEL_INFO, std::to_string(last_z).c_str());
 
 		z_out = fixUnityAngle(z_out);
 
