@@ -35,9 +35,11 @@ namespace je_nourish_fusion {
 		OSVR_ReturnCode update(OSVR_OrientationState* orientation, OSVR_TimeValue* timeValue);
 	protected:
 		OSVR_ClientInterface m_orientations[4];
+		osvr::clientkit::ClientContext m_ctx;
 		double m_alpha;
 		double m_last_yaw;
-		OSVR_TimeValue* m_last_timeValue;
+		double m_last_zfast;
+		OSVR_TimeValue m_last_timeValue;
 	};
 
 }

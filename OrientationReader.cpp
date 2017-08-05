@@ -33,13 +33,16 @@ namespace je_nourish_fusion {
 		osvrClientGetInterface(ctx, orientation_paths["yaw"].asCString(), &(m_orientations[2]));
 	}
 
-	FilteredOrientationReader::FilteredOrientationReader(OSVR_ClientContext ctx, Json::Value orientation_paths) {
+	FilteredOrientationReader::FilteredOrientationReader(OSVR_ClientContext ctx, Json::Value orientation_paths) : m_ctx(ctx) {
 		osvrClientGetInterface(ctx, orientation_paths["roll"].asCString(), &(m_orientations[0]));
 		osvrClientGetInterface(ctx, orientation_paths["pitch"].asCString(), &(m_orientations[1]));
 		osvrClientGetInterface(ctx, orientation_paths["yawFast"].asCString(), &(m_orientations[2]));
 		osvrClientGetInterface(ctx, orientation_paths["yawAccurate"].asCString(), &(m_orientations[3]));
 		// TO DO: Is this a bogus way to read in this value? Do I care?
 		m_alpha = orientation_paths["alpha"].asDouble();
+		m_last_yaw = 0;
+		m_last_zfast = 0;
+		m_last_timeValue = osvr::util::time::getNow();
 	}
 
 	OSVR_ReturnCode CombinedOrientationReader::update(OSVR_OrientationState* orientation, OSVR_TimeValue* timeValue) {
@@ -97,21 +100,36 @@ namespace je_nourish_fusion {
 		double z_accurate;
 		double z_out;
 		double a = m_alpha;
-		double last_y = m_last_yaw;
-		double dt = osvr::util::time::duration(*timeValue, *m_last_timeValue);
+		double last_z = m_last_yaw;
+		double last_z_fast = m_last_zfast;
+		double dt = ::osvr::util::time::duration(*timeValue, m_last_timeValue);
+		m_last_timeValue = *timeValue;
 
 		z_fast = osvrVec3GetZ(&rpy_z);
 		z_accurate = osvrVec3GetZ(&rpy_z2);
 
-		//z_fast = fixUnityAngle(z_fast);
-		//z_accurate = fixUnityAngle(z_accurate);
+		z_fast = fixUnityAngle(z_fast);
+		z_accurate = fixUnityAngle(z_accurate);
 
-		z_out = a*(last_y + z_fast*dt) + (1 - a)*(z_accurate);
+		if ((z_accurate < -M_PI / 2 && last_z > M_PI / 2) || (z_accurate > M_PI / 2 && last_z < -M_PI / 2)) {
+			last_z = z_accurate;
+			//z_fast = z_accurate;
+		}
+
+		z_out = a*(last_z + (z_fast-last_z_fast)*dt) + (1 - a)*(z_accurate);
+		
+		// TO-DO: Eventually this can be removed. It should be unnecessary.
+		if (std::isnan(z_out)) {
+			z_out = 0;
+		}
+		
+		//m_ctx.log(OSVR_LogLevel::OSVR_LOGLEVEL_INFO, "data:");
+		//m_ctx.log(OSVR_LogLevel::OSVR_LOGLEVEL_INFO, std::to_string(last_z).c_str());
 
 		z_out = fixUnityAngle(z_out);
 
 		m_last_yaw = z_out;
-		m_last_timeValue = timeValue;
+		m_last_zfast = z_fast;
 
 		OSVR_Vec3 rpy;
 		osvrVec3SetX(&rpy, osvrVec3GetX(&rpy_x));
