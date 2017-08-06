@@ -54,23 +54,23 @@ This replaces the `alignInitialOrientation` option in previous versions.
     				}
     			}
     		},
-			// Use the complementary filter to improve the yaw performance of a different Wii Nunchuk
+			// Use the complementary filter to improve the yaw performance of a home-made gyro device
     		{
     			"plugin": "je_nourish_fusion",
     			"driver": "FusionDevice",
     			"params": {
-    				"name": "Wii_Kinect_Left",
+    				"name": "Gyro_Kinect_Left",
     				"position": "/je_nourish_kinect/KinectV2/semantic/body1/arms/left/hand",
     				"orientation": {
-    					"roll": "/je_nourish_wiimote/WiimoteDevice/semantic/wiimote2/nunchuk",
-    					"pitch": "/je_nourish_wiimote/WiimoteDevice/semantic/wiimote2/nunchuk",
-    					// Nunchuk yaw updates faster, but Kinect yaw is more accurate over time (doesn't drift)
-						"yawFast": "/je_nourish_wiimote/WiimoteDevice/semantic/wiimote2/nunchuk",
+    					"roll": "/my-gyro-device/semantic/controller/left",
+    					"pitch": "/my-gyro-device/semantic/controller/left",
+    					// Gyro yaw updates faster, but Kinect yaw is more accurate over time (doesn't drift)
+						"yawFast": "/my-gyro-device/semantic/controller/left",
 						"yawAccurate": "/je_nourish_kinectv2/KinectV2/semantic/body1/arms/left/hand",
-						// Alpha must be between 0 and 1. Usually > 0.95
+						// Alpha must be between 0 and 1. Usually > 0.95, favoring speed.
 						"alpha": 0.99
     				},
-					// Pass the faster timestamp from the Nunchuk to OSVR.
+					// Pass the faster timestamp from the gyro device to OSVR.
 					"timestamp": "rotation"
     			}
     		}
@@ -78,6 +78,6 @@ This replaces the `alignInitialOrientation` option in previous versions.
     	"aliases": {
     		"/me/head": "/je_nourish_fusion/DK1_Kinectv2/tracker/0",
     		"/me/hands/right": "/je_nourish_fusion/Wii_Kinect_Right/tracker/0",
-			"/me/hands/left": "/je_nourish_fusion/Wii_Kinect_Left/tracker/0"
+			"/me/hands/left": "/je_nourish_fusion/Gyro_Kinect_Left/tracker/0"
     	}
     }
