@@ -28,10 +28,10 @@ namespace je_nourish_fusion {
 
 	double fixUnityAngle(double angle)
 	{
-		if (angle > M_PI * 17/16) {
+		if (angle > M_PI) {
 			angle = (2 * M_PI) - angle;
 		}
-		else if (angle < -M_PI * 17/16) {
+		else if (angle < -M_PI) {
 			angle = (2 * M_PI) + angle;
 		}
 		return angle;
