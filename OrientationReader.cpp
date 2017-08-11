@@ -95,7 +95,7 @@ namespace je_nourish_fusion {
 
 		double a = m_alpha;
 		double last_z = m_last_yaw;
-		
+
 		// A factor of 2*PI is missing in angularVelocity incremental quats - at least with the HDK.
 		double dt = angular_v.dt * 2 * M_PI;
 
@@ -112,8 +112,22 @@ namespace je_nourish_fusion {
 			last_z = z_accurate;
 		}
 
-		double z_out = a*(last_z + dz_fast) + (1 - a)*(z_accurate);
-		
+		double z_diff = fixUnityAngle(last_z - z_accurate);
+		double z_out;
+
+		// If the yaw difference is large enough > 10 deg but the rotation rate is small enough (< 2 deg/sec)
+		// then reset filter output to the accurate yaw value.
+		// This fixes the issue of "smooth" external yaw resets, making them instantaneous.
+		// Cutoff values determined empirically; in the future, perhaps these values could be configurable.
+		if ((z_diff <= -M_PI / 18 || z_diff >= M_PI / 18) && (dzdt_fast <= M_PI / 90 && dzdt_fast >= -M_PI / 90)) {
+			z_out = z_accurate;
+		}
+		// If the difference is smaller, implement the complementary filter.
+		else {
+			z_out = a*(last_z + dz_fast) + (1 - a)*(z_accurate);
+		}
+
+
 		// Replace bogus results with accurate yaw. Happens sometimes on startup.
 		if (std::isnan(z_out)) {
 			z_out = z_accurate;
