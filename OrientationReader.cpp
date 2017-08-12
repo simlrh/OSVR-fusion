@@ -39,6 +39,16 @@ namespace je_nourish_fusion {
 		osvrClientGetInterface(ctx, orientation_paths["yawFast"].asCString(), &(m_orientations[2]));
 		osvrClientGetInterface(ctx, orientation_paths["yawAccurate"].asCString(), &(m_orientations[3]));
 		m_alpha = orientation_paths["alpha"].asDouble();
+		if (orientation_paths["instantReset"].isNull()) {
+			m_instantReset = false;
+		} else {
+			m_instantReset = orientation_paths["instantReset"].asBool();
+			if (m_instantReset) {
+				m_ctx.log(OSVR_LogLevel::OSVR_LOGLEVEL_INFO, "instantReset is enabled in OSVR-Fusion.");
+				m_ctx.log(OSVR_LogLevel::OSVR_LOGLEVEL_INFO, "If you notice stuttering, disable instantReset.");
+			}
+		}
+
 		m_last_yaw = 0;
 
 		m_ctx.log(OSVR_LogLevel::OSVR_LOGLEVEL_INFO, "Initialized a complementary fusion filter.");
@@ -115,11 +125,12 @@ namespace je_nourish_fusion {
 		double z_diff = fixUnityAngle(last_z - z_accurate);
 		double z_out;
 
-		// If the yaw difference is large enough > 10 deg but the rotation rate is small enough (< 2 deg/sec)
+		// If the yaw difference is large enough > 30 deg but the rotation rate is small enough (< 2 deg/sec)
 		// then reset filter output to the accurate yaw value.
 		// This fixes the issue of "smooth" external yaw resets, making them instantaneous.
 		// Cutoff values determined empirically; in the future, perhaps these values could be configurable.
-		if ((z_diff <= -M_PI / 18 || z_diff >= M_PI / 18) && (dzdt_fast <= M_PI / 90 && dzdt_fast >= -M_PI / 90)) {
+		if (m_instantReset &&
+			(z_diff < -M_PI / 6 || z_diff > M_PI / 6) && (dzdt_fast < M_PI / 90 && dzdt_fast > -M_PI / 90)) {
 			z_out = z_accurate;
 		}
 		// If the difference is smaller, implement the complementary filter.
@@ -133,6 +144,7 @@ namespace je_nourish_fusion {
 			z_out = z_accurate;
 		}
 
+		// Keep the filter output nice and clean
 		z_out = fixUnityAngle(z_out);
 
 		m_last_yaw = z_out;

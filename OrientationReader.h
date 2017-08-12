@@ -35,6 +35,7 @@ namespace je_nourish_fusion {
 	protected:
 		OSVR_ClientInterface m_orientations[4];
 		osvr::clientkit::ClientContext m_ctx;
+		bool m_instantReset;
 		double m_alpha;
 		double m_last_yaw;
 	};
