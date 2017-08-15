@@ -39,16 +39,16 @@ namespace je_nourish_fusion {
 		osvrClientGetInterface(ctx, orientation_paths["yawFast"].asCString(), &(m_orientations[2]));
 		osvrClientGetInterface(ctx, orientation_paths["yawAccurate"].asCString(), &(m_orientations[3]));
 		m_alpha = orientation_paths["alpha"].asDouble();
-		if (orientation_paths["instantReset"].isNull()) {
+		if (orientation_paths["recenterButton"].isNull()) {
 			m_do_instant_reset = false;
 		} else {
 			m_do_instant_reset = true;
-			osvrClientGetInterface(ctx, orientation_paths["instantReset"].asCString(), &m_instant_reset_path);
-			m_ctx.log(OSVR_LogLevel::OSVR_LOGLEVEL_INFO, "instantReset is enabled in OSVR-Fusion.");
-			m_ctx.log(OSVR_LogLevel::OSVR_LOGLEVEL_INFO, "If you notice stuttering, disable instantReset.");
+			osvrClientGetInterface(ctx, orientation_paths["recenterButton"].asCString(), &m_instant_reset_path);
+			m_ctx.log(OSVR_LogLevel::OSVR_LOGLEVEL_INFO, "Recenter button detection is enabled in OSVR-Fusion.");
 		}
 
 		m_last_yaw = 0;
+		m_last_button_press = osvr::util::time::getNow();
 
 		m_ctx.log(OSVR_LogLevel::OSVR_LOGLEVEL_INFO, "Initialized a complementary fusion filter.");
 	}
@@ -101,77 +101,71 @@ namespace je_nourish_fusion {
 		rpyFromQuaternion(&orientation_z, &rpy_z);
 		rpyFromQuaternion(&angular_v.incrementalRotation, &rpy_v);
 
-		double a = m_alpha;
-		double last_z = m_last_yaw;
+		double a = m_alpha;				// Grab filter threshold variable
+		double last_z = m_last_yaw;		// Grab last yaw
+		double dt = angular_v.dt;		// Grab timestep for use with angular velocity. Strangely, not the same as time between timeValue args
 
-		double dt = angular_v.dt;
+		double z_accurate = osvrVec3GetZ(&rpy_z);					// Grab accurate yaw value
+		double dzdt_fast = osvrVec3GetZ(&rpy_v) * 2 * M_PI; 		// Grab fast yaw rate. A factor of 2*PI is missing in angularVelocity incremental quats - at least with the HDK.
 
-		double z_accurate = osvrVec3GetZ(&rpy_z);
-		double dzdt_fast = osvrVec3GetZ(&rpy_v) * 2 * M_PI; 		// A factor of 2*PI is missing in angularVelocity incremental quats - at least with the HDK.
+		double dz_fast = dt * dzdt_fast;	// Create fast yaw incremental value by multiplying by timestep
 
-		double dz_fast = dt * dzdt_fast;
-
+		// Clean up input angles
 		dz_fast = fixUnityAngle(dz_fast);
 		z_accurate = fixUnityAngle(z_accurate);
 
-		// Correct for the singularity at +-180 degrees
+		// Reset filter history if we cross the singularity at +/-180 degrees.
+		// This is a workaround for the filter spinning back the wrong way, but is not necessarily the best solution.
 		if ((z_accurate < -M_PI / 2 && last_z > M_PI / 2) || (z_accurate > M_PI / 2 && last_z < -M_PI / 2)) {
 			last_z = z_accurate;
 		}
 
-		//OSVR_TimeValue now = osvr::util::time::getNow();
-		//double t_diff = osvr::util::time::duration(now, m_last_report_time);
-		//m_last_report_time = now;
 
-		OSVR_ButtonState reset_button;
-		OSVR_ReturnCode resret = osvrGetButtonState(m_instant_reset_path, timeValue, &reset_button);
-
-		OSVR_TimeValue now = osvr::util::time::getNow();
-		if (reset_button == OSVR_BUTTON_PRESSED) {
-			m_last_report_time = now;
-		}
-		double t_diff = osvr::util::time::duration(now, m_last_report_time);
-
-		double z_displacement_limit = M_PI / 12;	// Equivalent to 15 degrees
-		double z_angular_limit = M_PI / 360; // Less than half a degree per second
+		double z_displacement_limit = M_PI / 18;		// Equivalent to 10 degrees
+		double z_angular_limit = M_PI / 180;			// Rotation less than one degree per second
 		double z_diff = fixUnityAngle(last_z - z_accurate);
 		double z_out;
 
-		static int boop;
-		boop += 1;
-		if (boop >= 250)
-		{
-			m_ctx.log(OSVR_LogLevel::OSVR_LOGLEVEL_INFO, "t_diff");
-			m_ctx.log(OSVR_LogLevel::OSVR_LOGLEVEL_INFO, std::to_string(t_diff).c_str());
-			//m_ctx.log(OSVR_LogLevel::OSVR_LOGLEVEL_INFO, "angular_limit");
-			//m_ctx.log(OSVR_LogLevel::OSVR_LOGLEVEL_INFO, std::to_string(z_angular_limit).c_str());
-			boop = 0;
+		// Read the instantReset button
+		OSVR_ButtonState reset_button;
+		OSVR_ReturnCode resret = osvrGetButtonState(m_instant_reset_path, timeValue, &reset_button);
+
+		// If instantReset is enabled, store the reset button press timestamp for later comparison
+		double button_time_diff;
+		if (m_do_instant_reset) {
+			OSVR_TimeValue now = osvr::util::time::getNow();
+			if (reset_button == OSVR_BUTTON_PRESSED) {
+				m_last_button_press = now;
+			}
+			button_time_diff = osvr::util::time::duration(now, m_last_button_press);
 		}
 
-		// If the yaw difference is large enough > 30 deg but the rotation rate is small enough (< 2 deg/sec)
-		// then reset filter output to the accurate yaw value.
-		// This fixes the issue of "smooth" external yaw resets, making them instantaneous.
-		// Cutoff values determined empirically; in the future, perhaps these values could be configurable.
-		if (m_do_instant_reset && (t_diff < 1.0) && 
+		// If instantReset is enabled, then perform some checks
+		// Is the difference between the previous yaw value and the current one sufficiently large?
+		// Is the angular velocity low?
+		// Was the reset button recently or currently pressed?
+		// If all conditions are true, then we probably detected a yaw reset, so make it snappy.
+		if (m_do_instant_reset && (button_time_diff < 0.5) && 
 			((z_diff < -z_displacement_limit) || (z_diff > z_displacement_limit)) && ((dzdt_fast < z_angular_limit) && (dzdt_fast > -z_angular_limit))) {
 			z_out = z_accurate;
 		}
-		// If the difference is smaller, implement the complementary filter.
+		// If instantReset is not enabled or if the checks are not met, carry on with regular filter implementation.
 		else {
 			z_out = a*(last_z + dz_fast) + (1 - a)*(z_accurate);
 		}
-
 
 		// Replace bogus results with accurate yaw. Happens sometimes on startup.
 		if (std::isnan(z_out)) {
 			z_out = z_accurate;
 		}
 
-		// Keep the filter output nice and clean
+		// Clean up the output angle just in case
 		z_out = fixUnityAngle(z_out);
 
+		// Store new value for next filter iteration
 		m_last_yaw = z_out;
 
+		// Report the new orientation
 		OSVR_Vec3 rpy;
 		osvrVec3SetX(&rpy, osvrVec3GetX(&rpy_x));
 		osvrVec3SetY(&rpy, osvrVec3GetY(&rpy_y));
