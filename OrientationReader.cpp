@@ -40,13 +40,12 @@ namespace je_nourish_fusion {
 		osvrClientGetInterface(ctx, orientation_paths["yawAccurate"].asCString(), &(m_orientations[3]));
 		m_alpha = orientation_paths["alpha"].asDouble();
 		if (orientation_paths["instantReset"].isNull()) {
-			m_instantReset = false;
+			m_do_instant_reset = false;
 		} else {
-			m_instantReset = orientation_paths["instantReset"].asBool();
-			if (m_instantReset) {
-				m_ctx.log(OSVR_LogLevel::OSVR_LOGLEVEL_INFO, "instantReset is enabled in OSVR-Fusion.");
-				m_ctx.log(OSVR_LogLevel::OSVR_LOGLEVEL_INFO, "If you notice stuttering, disable instantReset.");
-			}
+			m_do_instant_reset = true;
+			osvrClientGetInterface(ctx, orientation_paths["instantReset"].asCString(), &m_instant_reset_path);
+			m_ctx.log(OSVR_LogLevel::OSVR_LOGLEVEL_INFO, "instantReset is enabled in OSVR-Fusion.");
+			m_ctx.log(OSVR_LogLevel::OSVR_LOGLEVEL_INFO, "If you notice stuttering, disable instantReset.");
 		}
 
 		m_last_yaw = 0;
@@ -62,7 +61,6 @@ namespace je_nourish_fusion {
 		OSVR_ReturnCode xret = osvrGetOrientationState(m_orientations[0], timeValue, &orientation_x);
 		OSVR_ReturnCode yret = osvrGetOrientationState(m_orientations[1], timeValue, &orientation_y);
 		OSVR_ReturnCode zret = osvrGetOrientationState(m_orientations[2], timeValue, &orientation_z);
-
 
 		OSVR_Vec3 rpy_x;
 		OSVR_Vec3 rpy_y;
@@ -106,11 +104,10 @@ namespace je_nourish_fusion {
 		double a = m_alpha;
 		double last_z = m_last_yaw;
 
-		// A factor of 2*PI is missing in angularVelocity incremental quats - at least with the HDK.
-		double dt = angular_v.dt * 2 * M_PI;
+		double dt = angular_v.dt;
 
 		double z_accurate = osvrVec3GetZ(&rpy_z);
-		double dzdt_fast = osvrVec3GetZ(&rpy_v);
+		double dzdt_fast = osvrVec3GetZ(&rpy_v) * 2 * M_PI; 		// A factor of 2*PI is missing in angularVelocity incremental quats - at least with the HDK.
 
 		double dz_fast = dt * dzdt_fast;
 
@@ -122,15 +119,41 @@ namespace je_nourish_fusion {
 			last_z = z_accurate;
 		}
 
+		//OSVR_TimeValue now = osvr::util::time::getNow();
+		//double t_diff = osvr::util::time::duration(now, m_last_report_time);
+		//m_last_report_time = now;
+
+		OSVR_ButtonState reset_button;
+		OSVR_ReturnCode resret = osvrGetButtonState(m_instant_reset_path, timeValue, &reset_button);
+
+		OSVR_TimeValue now = osvr::util::time::getNow();
+		if (reset_button == OSVR_BUTTON_PRESSED) {
+			m_last_report_time = now;
+		}
+		double t_diff = osvr::util::time::duration(now, m_last_report_time);
+
+		double z_displacement_limit = M_PI / 12;	// Equivalent to 15 degrees
+		double z_angular_limit = M_PI / 360; // Less than half a degree per second
 		double z_diff = fixUnityAngle(last_z - z_accurate);
 		double z_out;
+
+		static int boop;
+		boop += 1;
+		if (boop >= 250)
+		{
+			m_ctx.log(OSVR_LogLevel::OSVR_LOGLEVEL_INFO, "t_diff");
+			m_ctx.log(OSVR_LogLevel::OSVR_LOGLEVEL_INFO, std::to_string(t_diff).c_str());
+			//m_ctx.log(OSVR_LogLevel::OSVR_LOGLEVEL_INFO, "angular_limit");
+			//m_ctx.log(OSVR_LogLevel::OSVR_LOGLEVEL_INFO, std::to_string(z_angular_limit).c_str());
+			boop = 0;
+		}
 
 		// If the yaw difference is large enough > 30 deg but the rotation rate is small enough (< 2 deg/sec)
 		// then reset filter output to the accurate yaw value.
 		// This fixes the issue of "smooth" external yaw resets, making them instantaneous.
 		// Cutoff values determined empirically; in the future, perhaps these values could be configurable.
-		if (m_instantReset &&
-			(z_diff < -M_PI / 6 || z_diff > M_PI / 6) && (dzdt_fast < M_PI / 90 && dzdt_fast > -M_PI / 90)) {
+		if (m_do_instant_reset && (t_diff < 1.0) && 
+			((z_diff < -z_displacement_limit) || (z_diff > z_displacement_limit)) && ((dzdt_fast < z_angular_limit) && (dzdt_fast > -z_angular_limit))) {
 			z_out = z_accurate;
 		}
 		// If the difference is smaller, implement the complementary filter.

@@ -35,9 +35,11 @@ namespace je_nourish_fusion {
 	protected:
 		OSVR_ClientInterface m_orientations[4];
 		osvr::clientkit::ClientContext m_ctx;
-		bool m_instantReset;
+		bool m_do_instant_reset;
+		OSVR_ClientInterface m_instant_reset_path;
 		double m_alpha;
 		double m_last_yaw;
+		OSVR_TimeValue m_last_report_time;
 	};
 
 }
