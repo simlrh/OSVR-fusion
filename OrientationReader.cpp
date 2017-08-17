@@ -41,7 +41,8 @@ namespace je_nourish_fusion {
 		m_alpha = orientation_paths["alpha"].asDouble();
 		if (orientation_paths["recenterButton"].isNull()) {
 			m_do_instant_reset = false;
-		} else {
+		}
+		else {
 			m_do_instant_reset = true;
 			osvrClientGetInterface(ctx, orientation_paths["recenterButton"].asCString(), &m_instant_reset_path);
 			m_ctx.log(OSVR_LogLevel::OSVR_LOGLEVEL_INFO, "Recenter button detection is enabled in OSVR-Fusion.");
@@ -105,25 +106,22 @@ namespace je_nourish_fusion {
 		double last_z = m_last_yaw;		// Grab last yaw
 		double dt = angular_v.dt;		// Grab timestep for use with angular velocity. Strangely, not the same as time between timeValue args
 
-		double z_accurate = osvrVec3GetZ(&rpy_z);					// Grab accurate yaw value
-		double dzdt_fast = osvrVec3GetZ(&rpy_v) * 2 * M_PI; 		// Grab fast yaw rate. A factor of 2*PI is missing in angularVelocity incremental quats - at least with the HDK.
-
-		double dz_fast = dt * dzdt_fast;	// Create fast yaw incremental value by multiplying by timestep
+		double z_accurate = osvrVec3GetZ(&rpy_z);				// Grab accurate yaw value
+		double dzdt_fast = osvrVec3GetZ(&rpy_v) * 2 * M_PI; 	// Grab fast yaw rate. A factor of 2*PI is missing in angularVelocity incremental quats - at least with the HDK.
+		double dz_fast = dt * dzdt_fast;						// Create fast yaw incremental value by multiplying by timestep
+		double z_fast = last_z + dz_fast;						// Create fast yaw value.
 
 		// Clean up input angles
-		dz_fast = fixUnityAngle(dz_fast);
-		z_accurate = fixUnityAngle(z_accurate);
+		z_fast = fixAngleWrap(z_fast);
+		z_accurate = fixAngleWrap(z_accurate);
 
-		// Reset filter history if we cross the singularity at +/-180 degrees.
-		// This is a workaround for the filter spinning back the wrong way, but is not necessarily the best solution.
-		if ((z_accurate < -M_PI / 2 && last_z > M_PI / 2) || (z_accurate > M_PI / 2 && last_z < -M_PI / 2)) {
-			last_z = z_accurate;
-		}
-
+		// Handle angle wrap discrepancies (prevents the filter from spinning wrong way)
+		if (z_accurate < -M_PI / 2 && z_fast > M_PI / 2) { z_fast -= 2 * M_PI; }
+		if (z_accurate > M_PI / 2 && z_fast < -M_PI / 2) { z_fast += 2 * M_PI; }
 
 		double z_displacement_limit = M_PI / 18;		// Equivalent to 10 degrees
 		double z_angular_limit = M_PI / 180;			// Rotation less than one degree per second
-		double z_diff = fixUnityAngle(last_z - z_accurate);
+		double z_diff = fixAngleWrap(last_z - z_accurate);
 		double z_out;
 
 		// Read the instantReset button
@@ -145,13 +143,13 @@ namespace je_nourish_fusion {
 		// Is the angular velocity low?
 		// Was the reset button recently or currently pressed?
 		// If all conditions are true, then we probably detected a yaw reset, so make it snappy.
-		if (m_do_instant_reset && (button_time_diff < 0.5) && 
+		if (m_do_instant_reset && (button_time_diff < 0.5) &&
 			((z_diff < -z_displacement_limit) || (z_diff > z_displacement_limit)) && ((dzdt_fast < z_angular_limit) && (dzdt_fast > -z_angular_limit))) {
 			z_out = z_accurate;
 		}
 		// If instantReset is not enabled or if the checks are not met, carry on with regular filter implementation.
 		else {
-			z_out = a*(last_z + dz_fast) + (1 - a)*(z_accurate);
+			z_out = a*(z_fast)+(1 - a)*(z_accurate);
 		}
 
 		// Replace bogus results with accurate yaw. Happens sometimes on startup.
@@ -160,7 +158,7 @@ namespace je_nourish_fusion {
 		}
 
 		// Clean up the output angle just in case
-		z_out = fixUnityAngle(z_out);
+		z_out = fixAngleWrap(z_out);
 
 		// Store new value for next filter iteration
 		m_last_yaw = z_out;

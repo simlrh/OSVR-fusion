@@ -26,10 +26,10 @@ namespace je_nourish_fusion {
 		osvrQuatSetW(quaternion, cos(r / 2) * cos(p / 2) * cos(y / 2) + sin(r / 2) * sin(p / 2) * sin(y / 2));
 	}
 
-	double fixUnityAngle(double angle)
+	double fixAngleWrap(double angle)
 	{
 		if (angle > M_PI) {
-			angle = (2 * M_PI) - angle;
+			angle = -(2 * M_PI) + angle;
 		}
 		else if (angle < -M_PI) {
 			angle = (2 * M_PI) + angle;
