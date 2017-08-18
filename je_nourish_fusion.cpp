@@ -85,6 +85,11 @@ namespace je_nourish_fusion {
 					if (button_time_diff < 0.5) {
 						if (m_flipLastButtonValue == false) {
 							m_isFlipped = !m_isFlipped;
+							if (m_isFlipped) {
+								OSVR_PositionState originPosition;
+								OSVR_ReturnCode originret = osvrGetPositionState(m_flipOriginDevice, &now, &originPosition);
+								m_flipOrigin = originPosition;
+							}
 						}
 					}
 					m_flipLastButtonValue = true;
@@ -96,10 +101,10 @@ namespace je_nourish_fusion {
 
 				// Handle flip
 				if (m_isFlipped) {
-					OSVR_PositionState originPosition;
-					OSVR_ReturnCode originret = osvrGetPositionState(m_flipOriginDevice, &now, &originPosition);
+					//OSVR_PositionState originPosition;
+					//OSVR_ReturnCode originret = osvrGetPositionState(m_flipOriginDevice, &now, &originPosition);
 					
-					Eigen::Map<Eigen::Vector3d> originTranslation = osvr::util::vecMap(originPosition);
+					Eigen::Map<Eigen::Vector3d> originTranslation = osvr::util::vecMap(m_flipOrigin);
 					Eigen::Map<Eigen::Vector3d> deviceTranslation = osvr::util::vecMap(m_state.translation);
 					
 					Eigen::Vector3d flippedTranslation(2 * originTranslation.x() - deviceTranslation.x(),
@@ -157,6 +162,7 @@ namespace je_nourish_fusion {
 		bool m_useFlip;
 		bool m_flipLastButtonValue;
 		bool m_isFlipped = false;
+		OSVR_Vec3 m_flipOrigin;
 		OSVR_TimeValue m_flipTime;
 	};
 
