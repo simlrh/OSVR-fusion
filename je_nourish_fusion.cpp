@@ -45,6 +45,15 @@ namespace je_nourish_fusion {
 				std::cout << "Fusion Device: Orientation Reader not created" << std::endl;
 			}
 
+			m_useFlip = config.isMember("flipButton") && config.isMember("flipOrigin");
+			if (m_useFlip) {
+				osvrClientGetInterface(m_ctx, config["flipButton"].asCString(), &m_flipButton);
+				osvrClientGetInterface(m_ctx, config["flipOrigin"].asCString(), &m_flipOriginDevice);
+				m_flipLastButtonValue = false;
+				m_isFlipped = false;
+				m_flipTime = osvr::util::time::getNow();
+			}
+
 			m_dev->sendJsonDescriptor(je_nourish_fusion_json);
 			m_dev->registerUpdateCallback(this);
 		}
@@ -63,6 +72,55 @@ namespace je_nourish_fusion {
 				Eigen::Map<Eigen::Vector3d> translation = osvr::util::vecMap(m_state.translation);
 
 				translation += rotation._transformVector(osvr::util::vecMap(m_offset));
+			}
+
+			if (m_useFlip) {
+				// Check for button press
+				OSVR_TimeValue now = osvr::util::time::getNow();
+				OSVR_ButtonState flip_button_state;
+				OSVR_ReturnCode flipret = osvrGetButtonState(m_flipButton, &now, &flip_button_state);
+				double button_time_diff;
+				if (flip_button_state == OSVR_BUTTON_PRESSED) {
+					button_time_diff = osvr::util::time::duration(now, m_flipTime);
+					if (button_time_diff < 0.5) {
+						if (m_flipLastButtonValue == false) {
+							m_isFlipped = !m_isFlipped;
+						}
+					}
+					m_flipLastButtonValue = true;
+					m_flipTime = now;
+				}
+				else {
+					m_flipLastButtonValue = false;
+				}
+
+				// Handle flip
+				if (m_isFlipped) {
+					OSVR_PositionState originPosition;
+					OSVR_ReturnCode originret = osvrGetPositionState(m_flipOriginDevice, &now, &originPosition);
+					
+					Eigen::Map<Eigen::Vector3d> originTranslation = osvr::util::vecMap(originPosition);
+					Eigen::Map<Eigen::Vector3d> deviceTranslation = osvr::util::vecMap(m_state.translation);
+					
+					Eigen::Vector3d flippedTranslation(2 * originTranslation.x() - deviceTranslation.x(),
+						deviceTranslation.y(),
+						2 * originTranslation.z() - deviceTranslation.z());
+
+					deviceTranslation = flippedTranslation;
+
+					OSVR_Quaternion rotateQ;
+					osvrQuatSetW(&rotateQ, 0);
+					osvrQuatSetX(&rotateQ, 0);
+					osvrQuatSetY(&rotateQ, 1);
+					osvrQuatSetZ(&rotateQ, 0);
+
+					Eigen::Quaterniond rotateQ_eigen = osvr::util::fromQuat(rotateQ);
+					Eigen::Quaterniond deviceQ_eigen = osvr::util::fromQuat(m_state.rotation);
+
+					Eigen::Quaterniond hmdRotation = rotateQ_eigen * deviceQ_eigen;
+
+					osvr::util::toQuat(hmdRotation, m_state.rotation);
+				}
 			}
 
 			if (m_useTimestamp) {
@@ -93,6 +151,13 @@ namespace je_nourish_fusion {
 
 		bool m_useTimestamp;
 		bool m_usePositionTimestamp;
+
+		OSVR_ClientInterface m_flipButton;
+		OSVR_ClientInterface m_flipOriginDevice;
+		bool m_useFlip;
+		bool m_flipLastButtonValue;
+		bool m_isFlipped = false;
+		OSVR_TimeValue m_flipTime;
 	};
 
 	class FusionDeviceConstructor {
