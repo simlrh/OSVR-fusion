@@ -101,9 +101,6 @@ namespace je_nourish_fusion {
 
 				// Handle flip
 				if (m_isFlipped) {
-					//OSVR_PositionState originPosition;
-					//OSVR_ReturnCode originret = osvrGetPositionState(m_flipOriginDevice, &now, &originPosition);
-					
 					Eigen::Map<Eigen::Vector3d> originTranslation = osvr::util::vecMap(m_flipOrigin);
 					Eigen::Map<Eigen::Vector3d> deviceTranslation = osvr::util::vecMap(m_state.translation);
 					
