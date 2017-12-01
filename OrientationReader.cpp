@@ -49,7 +49,7 @@ namespace je_nourish_fusion {
 		}
 
 		m_last_yaw = 0;
-		m_last_button_press = osvr::util::time::getNow();
+		m_reset_press_time = osvr::util::time::getNow();
 
 		m_ctx.log(OSVR_LogLevel::OSVR_LOGLEVEL_INFO, "Initialized a complementary fusion filter.");
 	}
@@ -133,9 +133,9 @@ namespace je_nourish_fusion {
 		if (m_do_instant_reset) {
 			OSVR_TimeValue now = osvr::util::time::getNow();
 			if (reset_button == OSVR_BUTTON_PRESSED) {
-				m_last_button_press = now;
+				m_reset_press_time = now;
 			}
-			button_time_diff = osvr::util::time::duration(now, m_last_button_press);
+			button_time_diff = osvr::util::time::duration(now, m_reset_press_time);
 		}
 
 		// If instantReset is enabled, then perform some checks

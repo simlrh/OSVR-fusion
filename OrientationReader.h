@@ -37,7 +37,7 @@ namespace je_nourish_fusion {
 		osvr::clientkit::ClientContext m_ctx;
 		bool m_do_instant_reset;
 		OSVR_ClientInterface m_instant_reset_path;
-		OSVR_TimeValue m_last_button_press;
+		OSVR_TimeValue m_reset_press_time;
 		double m_alpha;
 		double m_last_yaw;
 	};
