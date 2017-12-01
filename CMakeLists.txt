@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 2.8.12)
 project(FusionPlugin) 
 
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set( CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH} )
 
 find_package(osvr REQUIRED)
