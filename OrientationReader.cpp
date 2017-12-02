@@ -39,6 +39,7 @@ namespace je_nourish_fusion {
 		osvrClientGetInterface(ctx, orientation_paths["yawFast"].asCString(), &(m_orientations[2]));
 		osvrClientGetInterface(ctx, orientation_paths["yawAccurate"].asCString(), &(m_orientations[3]));
 		m_alpha = orientation_paths["alpha"].asDouble();
+		m_do_soft_reset = orientation_paths["softReset"].asBool();
 		if (orientation_paths["recenterButton"].isNull()) {
 			m_do_instant_reset = false;
 		}
@@ -46,6 +47,10 @@ namespace je_nourish_fusion {
 			m_do_instant_reset = true;
 			osvrClientGetInterface(ctx, orientation_paths["recenterButton"].asCString(), &m_instant_reset_path);
 			m_ctx.log(OSVR_LogLevel::OSVR_LOGLEVEL_INFO, "Recenter button detection is enabled in OSVR-Fusion.");
+			if (m_do_soft_reset) {
+				m_ctx.log(OSVR_LogLevel::OSVR_LOGLEVEL_INFO, "Soft recenter is enabled in OSVR-Fusion.");
+				osvrRegisterButtonCallback(m_instant_reset_path, &(je_nourish_fusion::soft_reset_callback), this);
+			}
 		}
 
 		m_last_yaw = 0;
@@ -53,6 +58,18 @@ namespace je_nourish_fusion {
 
 		m_ctx.log(OSVR_LogLevel::OSVR_LOGLEVEL_INFO, "Initialized a complementary fusion filter.");
 	}
+
+	void soft_reset_callback(void* userdata, const OSVR_TimeValue *timestamp, const OSVR_ButtonReport *report) {
+		FilteredOrientationReader *reader = (FilteredOrientationReader*)userdata;
+		if (report->state == OSVR_BUTTON_PRESSED) {
+			reader->m_yaw_offset = reader->m_yaw_raw;
+			reader->m_ctx.log(OSVR_LogLevel::OSVR_LOGLEVEL_INFO, "Button was pressed.");
+		}
+		reader->m_ctx.log(OSVR_LogLevel::OSVR_LOGLEVEL_INFO, "Button callback received.");
+		//std::cout << "Got button report: button is " << (report->state ? "pressed" : "released") << std::endl << std::flush;
+		
+	}
+
 
 	OSVR_ReturnCode CombinedOrientationReader::update(OSVR_OrientationState* orientation, OSVR_TimeValue* timeValue) {
 		OSVR_OrientationState orientation_x;
@@ -143,13 +160,14 @@ namespace je_nourish_fusion {
 		// Is the angular velocity low?
 		// Was the reset button recently or currently pressed?
 		// If all conditions are true, then we probably detected a yaw reset, so make it snappy.
-		if (m_do_instant_reset && (button_time_diff < 0.5) &&
+		if (m_do_instant_reset && !m_do_soft_reset && (button_time_diff < 0.5) &&
 			((z_diff < -z_displacement_limit) || (z_diff > z_displacement_limit)) && ((dzdt_fast < z_angular_limit) && (dzdt_fast > -z_angular_limit))) {
 			z_out = z_accurate;
 		}
 		// If instantReset is not enabled or if the checks are not met, carry on with regular filter implementation.
 		else {
 			z_out = a*(z_fast)+(1 - a)*(z_accurate);
+			m_yaw_raw = z_accurate;
 		}
 
 		// Replace bogus results with accurate yaw. Happens sometimes on startup.
@@ -167,11 +185,10 @@ namespace je_nourish_fusion {
 		OSVR_Vec3 rpy;
 		osvrVec3SetX(&rpy, osvrVec3GetX(&rpy_x));
 		osvrVec3SetY(&rpy, osvrVec3GetY(&rpy_y));
-		osvrVec3SetZ(&rpy, z_out);
+		osvrVec3SetZ(&rpy, z_out - m_yaw_offset);
 
 		quaternionFromRPY(&rpy, orientation);
 
 		return OSVR_RETURN_SUCCESS;
 	}
-
 }
