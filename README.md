@@ -15,6 +15,10 @@ For example, with the OSVR HDK and a Kinect, you would place the HDK in front of
     osvr_reset_yaw.exe --path "/com_osvr_Multiserver/OSVRHackerDevKitPrediction0/semantic/hmd"
 
 This replaces the `alignInitialOrientation` option in previous versions.
+
+## Maintainers
+
+[nanospork](https://github.com/nanospork) and [simlrh](https://github.com/simlrh)
 	
 ## Sample osvr_server_config.json:
 
