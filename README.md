@@ -4,6 +4,8 @@ An OSVR plugin that creates trackers from different sources of data. For example
 
 It can also combine axes from different trackers, eg taking pitch and roll from an accelerometer and yaw from a magnetometer, or x and y position from a video tracker and z position from a depth camera.
 
+A complementary filter can be used to smoothly merge yaw data from one device with another. For example, a faster gyroscopic yaw reading from one device can be combined with a more accurate video tracker yaw reading from another device.
+
 Build following the [standard OSVR plugin build instructions](http://resource.osvr.com/docs/OSVR-Core/TopicWritingDevicePlugin.html).
 
 ## Tracker alignment
@@ -55,10 +57,31 @@ This replaces the `alignInitialOrientation` option in previous versions.
     					"yaw": "/je_nourish_kinectv2/KinectV2/semantic/body1/arms/right/hand"
     				}
     			}
+    		},
+			// Use the complementary filter to improve the yaw performance of a home-made gyro device
+    		{
+    			"plugin": "je_nourish_fusion",
+    			"driver": "FusionDevice",
+    			"params": {
+    				"name": "Gyro_Kinect_Left",
+    				"position": "/je_nourish_kinect/KinectV2/semantic/body1/arms/left/hand",
+    				"orientation": {
+    					"roll": "/my-gyro-device/semantic/controller/left",
+    					"pitch": "/my-gyro-device/semantic/controller/left",
+    					// Gyro yaw updates faster, but Kinect yaw is more accurate over time (doesn't drift)
+						"yawFast": "/my-gyro-device/semantic/controller/left",
+						"yawAccurate": "/je_nourish_kinectv2/KinectV2/semantic/body1/arms/left/hand",
+						// Alpha must be between 0 and 1. Usually > 0.95, favoring speed.
+						"alpha": 0.99
+    				},
+					// Pass the faster timestamp from the gyro device to OSVR.
+					"timestamp": "rotation"
+    			}
     		}
 		],
     	"aliases": {
     		"/me/head": "/je_nourish_fusion/DK1_Kinectv2/tracker/0",
-    		"/me/hands/right": "/je_nourish_fusion/Wii_Kinect_Right/tracker/0"
+    		"/me/hands/right": "/je_nourish_fusion/Wii_Kinect_Right/tracker/0",
+			"/me/hands/left": "/je_nourish_fusion/Gyro_Kinect_Left/tracker/0"
     	}
     }
